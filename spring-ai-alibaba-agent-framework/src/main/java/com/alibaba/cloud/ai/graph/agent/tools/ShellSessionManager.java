@@ -145,11 +145,21 @@ public class ShellSessionManager {
 
 	/**
 	 * Execute a command in the current shell session.
+	 * If the session is not found in the config context (e.g., after resuming from
+	 * a Human-in-the-Loop interruption where the context is not persisted),
+	 * it will be auto-initialized.
 	 */
 	public CommandResult executeCommand(String command, RunnableConfig config) {
 		ShellSession session = (ShellSession) config.context().get(SESSION_INSTANCE_CONTEXT_KEY);
 		if (session == null) {
-			throw new IllegalStateException("Shell session not initialized. Call initialize() first, you might need to enable ShellToolAgentHook to enable shell session management.");
+			log.info("Shell session not found in context, auto-initializing. "
+					+ "This can happen when resuming from an interruption (e.g., Human-in-the-Loop approval).");
+			initialize(config);
+			session = (ShellSession) config.context().get(SESSION_INSTANCE_CONTEXT_KEY);
+			if (session == null) {
+				throw new IllegalStateException("Shell session not initialized. Call initialize() first, "
+						+ "you might need to enable ShellToolAgentHook to enable shell session management.");
+			}
 		}
 
 		log.info("Executing shell command: {}", command);
@@ -175,11 +185,15 @@ public class ShellSessionManager {
 
 	/**
 	 * Restart the shell session.
+	 * If the session is not found in the config context (e.g., after resuming from
+	 * a Human-in-the-Loop interruption), it will be auto-initialized instead of restarted.
 	 */
 	public void restartSession(RunnableConfig config) {
 		ShellSession session = (ShellSession) config.context().get(SESSION_INSTANCE_CONTEXT_KEY);
 		if (session == null) {
-			throw new IllegalStateException("Shell session not initialized.");
+			log.info("Shell session not found in context for restart, auto-initializing instead.");
+			initialize(config);
+			return;
 		}
 
 		log.info("Restarting shell session");
